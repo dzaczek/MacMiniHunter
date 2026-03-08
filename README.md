@@ -44,7 +44,7 @@ graph TD
 
     subgraph "UI & Access"
         G --> K[Rust Dashboard]
-        K --> L[Web UI (Charts & Tables)]
+        K --> L["Web UI (Charts & Tables)"]
         M[Cloudflare Tunnel] <--> K
         N[User Browser] <--> M
     end

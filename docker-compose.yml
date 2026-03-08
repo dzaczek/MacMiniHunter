@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-mac_tracker}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tracker} -d ${POSTGRES_DB:-mac_tracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tracker-net
+
+  scraper:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-mac_tracker}
+    networks:
+      - tracker-net
+
+  dashboard:
+    build: ./dashboard
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-mac_tracker}
+      DASH_USER: ${DASH_USER:-admin}
+      DASH_PASS: ${DASH_PASS:?DASH_PASS is required - set dashboard password in .env}
+    networks:
+      - tracker-net
+    # No ports exposed - accessible only via cloudflared tunnel
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    networks:
+      - tracker-net
+
+volumes:
+  pgdata:
+
+networks:
+  tracker-net:
+    driver: bridge

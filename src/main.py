@@ -2,6 +2,8 @@
 
 import logging
 import sys
+import random
+import time
 from datetime import datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -53,6 +55,7 @@ def run_scrape_cycle():
     store_counts: dict[str, int] = {}
 
     try:
+        random.shuffle(SCRAPERS)  # Randomize order to be less predictable
         for scraper_cls in SCRAPERS:
             scraper = scraper_cls()
             prices = scraper.run()
@@ -63,6 +66,12 @@ def run_scrape_cycle():
             else:
                 store_counts[scraper.STORE_NAME] = 0
                 logger.warning(f"[{scraper.STORE_NAME}] No results returned")
+
+            # Wait between scrapers to avoid burst activity
+            if scraper_cls != SCRAPERS[-1]:
+                wait = random.uniform(20.0, 60.0)
+                logger.info(f"Waiting {wait:.1f}s before next store...")
+                time.sleep(wait)
 
         # Detect price drops and send alerts
         drops = price_service.detect_price_drops(days=7, threshold_pct=5.0)

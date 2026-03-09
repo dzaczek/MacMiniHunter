@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.utils.stealth import create_session, random_delay
+from src.utils.stealth import create_session, random_delay, get_random_ipv6
 from src.utils.validators import ScrapedPrice
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,8 @@ class BaseScraper(ABC):
     BASE_URL: str = ""
 
     def __init__(self, proxy: Optional[str] = None):
-        self.session = create_session(proxy=proxy)
+        self.local_addr = get_random_ipv6()
+        self.session = create_session(proxy=proxy, local_addr=self.local_addr)
         self.proxy = proxy
 
     @abstractmethod

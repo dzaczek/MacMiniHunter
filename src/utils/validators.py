@@ -33,6 +33,7 @@ SSD_NORMALIZE = {1024: 1000, 2048: 2000, 4096: 4000, 8192: 8000}
 # This is the most reliable way to identify exact configurations across stores
 APPLE_SKU_SPECS: dict[str, tuple[str, int, int, int, int]] = {
     # M4 base models
+    "MU9D3": ("M4", 10, 10, 16, 256),
     "MXK53": ("M4", 10, 10, 16, 256),
     "MXK73": ("M4", 10, 10, 16, 512),
     "MXK93": ("M4", 10, 10, 24, 512),

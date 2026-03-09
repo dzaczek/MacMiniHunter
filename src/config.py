@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     matrix_room_id: str = ""
 
     # Scraper
-    scrape_interval_hours: int = 12
-    request_delay_min: float = 2.5
-    request_delay_max: float = 7.8
+    scrape_interval_hours: int = 18
+    request_delay_min: float = 5.0
+    request_delay_max: float = 15.0
 
     class Config:
         env_file = ".env"

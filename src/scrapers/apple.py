@@ -20,23 +20,28 @@ class AppleScraper(BaseScraper):
     BASE_URL = "https://www.apple.com"
     SHOP_URL = "https://www.apple.com/ch-de/shop/buy-mac/mac-mini"
 
-    # Map Apple's internal price keys to product specs
-    # Format: key -> (chip_label, description)
+    # Map Apple's internal price keys to human-readable labels.
     PRICE_KEY_MAP = {
         "m4-10-10": ("M4", "10-Core CPU, 10-Core GPU"),
         "m4pro-12-16": ("M4 Pro", "12-Core CPU, 16-Core GPU"),
         "m4pro-14-20": ("M4 Pro", "14-Core CPU, 20-Core GPU"),
     }
 
-    # Known Apple Mac Mini M4 configurations with specs
-    # (chip, ram_gb, ssd_gb, base_price_key_hint)
-    KNOWN_CONFIGS = [
-        ("M4", 16, 256),
-        ("M4", 16, 512),
-        ("M4", 24, 512),
-        ("M4 Pro", 24, 512),
-        ("M4 Pro", 48, 512),
-    ]
+    # Apple reuses the same "m4-10-10" key for several M4 storage / RAM options.
+    # We map each repeated key occurrence to a concrete variant in ascending price order.
+    SEO_KEY_CONFIGS = {
+        "m4-10-10": [
+            ("M4", 16, 256, 10, 10),
+            ("M4", 16, 512, 10, 10),
+            ("M4", 24, 512, 10, 10),
+        ],
+        "m4pro-12-16": [
+            ("M4 Pro", 24, 512, 12, 16),
+        ],
+        "m4pro-14-20": [
+            ("M4 Pro", 48, 512, 14, 20),
+        ],
+    }
 
     def search_mac_mini(self) -> list[ScrapedPrice]:
         """Extract Mac Mini prices from Apple Store CH."""
@@ -95,45 +100,57 @@ class AppleScraper(BaseScraper):
             chip = "M4 Pro" if ram >= 24 else "M4"
             logger.debug(f"[{self.STORE_NAME}] Found card: {chip} {ram}GB {ssd}GB")
 
-        # Primary extraction: seoPrice with config matching
+        # Primary extraction: seoPrice with deterministic config matching
         seo_prices = re.findall(r'"seoPrice"\s*:\s*([\d.]+)', html)
         config_keys = re.findall(r'"(m4[^"]*)":\{[^}]*comparativeDisplayPrice', html)
 
         if seo_prices and config_keys:
-            price_entries = list(zip(config_keys, seo_prices))
-
-            for key, price_str in price_entries:
+            prices_by_key: dict[str, list[float]] = {}
+            for key, price_str in zip(config_keys, seo_prices):
                 try:
-                    price = float(price_str)
+                    prices_by_key.setdefault(key, []).append(float(price_str))
                 except (ValueError, TypeError):
                     continue
 
+            for key, prices in prices_by_key.items():
                 chip_label, desc = self.PRICE_KEY_MAP.get(key, ("M4", key))
+                variants = self.SEO_KEY_CONFIGS.get(key, [])
 
-                # Match to known configs by chip and price range
-                matched_configs = [c for c in self.KNOWN_CONFIGS if c[0] == chip_label]
-
-                if matched_configs:
-                    # Use the cheapest unmatched config for this chip
-                    for chip, ram, ssd in matched_configs:
-                        title = f"Apple Mac mini {chip} {ram}GB {ssd}GB ({desc})"
+                if variants:
+                    for (chip, ram, ssd, cpu_cores, gpu_cores), price in zip(variants, sorted(prices)):
+                        title = (
+                            f"Apple Mac mini {chip} {ram}GB {ssd}GB "
+                            f"({cpu_cores}-Core CPU, {gpu_cores}-Core GPU)"
+                        )
                         try:
                             results.append(ScrapedPrice(
                                 title=title,
                                 price_chf=price,
                                 url=self.SHOP_URL,
+                                external_id=f"apple-seo:{key}:{ram}:{ssd}:{cpu_cores}:{gpu_cores}",
                                 availability=True,
                             ))
                         except (ValueError, TypeError):
                             continue
-                        break  # Only use the first matching config per price key
-                else:
+
+                    if len(prices) != len(variants):
+                        logger.warning(
+                            "[%s] Expected %s price entries for %s, got %s",
+                            self.STORE_NAME,
+                            len(variants),
+                            key,
+                            len(prices),
+                        )
+                    continue
+
+                for price in prices:
                     title = f"Apple Mac mini {chip_label} ({desc})"
                     try:
                         results.append(ScrapedPrice(
                             title=title,
                             price_chf=price,
                             url=self.SHOP_URL,
+                            external_id=f"apple-seo:{key}:{price}",
                             availability=True,
                         ))
                     except (ValueError, TypeError):

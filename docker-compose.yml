@@ -14,6 +14,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ports:
+      - "127.0.0.1:5432:5432"  # Only expose to localhost
     networks:
       - tracker-net
 
@@ -26,9 +28,9 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-mac_tracker}
-    networks:
-      - tracker-net
+      # Use localhost instead of db name because of network_mode: host
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-change_me_in_production}@localhost:5432/${POSTGRES_DB:-mac_tracker}
+    network_mode: host
 
   dashboard:
     build: ./dashboard

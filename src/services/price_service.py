@@ -86,17 +86,19 @@ class PriceService:
             if existing:
                 return existing
 
-        # Try to find by URL
-        existing = self.session.execute(
-            select(ProductLink).where(
-                and_(
-                    ProductLink.store_id == store.id,
-                    ProductLink.url == scraped.url,
+        # Only use URL matching when the scraper has no stable external_id.
+        # Some stores (like Apple) serve many configs from a shared URL.
+        if not scraped.external_id:
+            existing = self.session.execute(
+                select(ProductLink).where(
+                    and_(
+                        ProductLink.store_id == store.id,
+                        ProductLink.url == scraped.url,
+                    )
                 )
-            )
-        ).scalar_one_or_none()
-        if existing:
-            return existing
+            ).scalar_one_or_none()
+            if existing:
+                return existing
 
         # Parse product specs - try SKU first, then title parsing
         specs = parse_specs_from_title(scraped.title, external_id=scraped.external_id)

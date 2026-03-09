@@ -13,6 +13,19 @@ from src.utils.validators import ScrapedPrice, parse_specs_from_title
 
 logger = logging.getLogger(__name__)
 
+DIRECT_STORE_ALIASES = {
+    "apple store",
+    "brack",
+    "brack.ch ag",
+    "digitec",
+    "dq solutions",
+    "dq-solutions.ch",
+    "fust",
+    "galaxus",
+    "ricardo",
+    "tutti",
+}
+
 
 class PriceService:
     def __init__(self, session: Session):
@@ -47,6 +60,8 @@ class PriceService:
                 # Use per-item store_name if set (from comparison sites),
                 # otherwise use the scraper's store_name
                 effective_store_name = scraped.store_name or store_name
+                if self._should_skip_aggregated_offer(store_name, effective_store_name):
+                    continue
                 store = get_store(effective_store_name)
 
                 product_link = self._get_or_create_product_link(store, scraped)
@@ -68,6 +83,14 @@ class PriceService:
         self.session.commit()
         logger.info(f"[{store_name}] Saved {saved}/{len(prices)} price records")
         return saved
+
+    def _should_skip_aggregated_offer(self, source_store: str, effective_store_name: str) -> bool:
+        """Use comparison sites only as fallback for stores without a direct scraper."""
+        if source_store != "Toppreise":
+            return False
+
+        normalized = effective_store_name.strip().lower()
+        return normalized in DIRECT_STORE_ALIASES
 
     def _get_or_create_product_link(
         self, store: Store, scraped: ScrapedPrice

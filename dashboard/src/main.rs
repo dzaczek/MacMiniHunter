@@ -48,6 +48,7 @@ struct PriceRow {
     gpu_cores: Option<i32>,
     price_chf: f64,
     availability: bool,
+    is_aggregated: bool,
     scraped_at: NaiveDateTime,
     url: String,
 }
@@ -58,6 +59,7 @@ struct BestDeal {
     store: String,
     price_chf: f64,
     availability: bool,
+    is_aggregated: bool,
     scraped_at: NaiveDateTime,
     url: String,
     chip: String,
@@ -71,6 +73,20 @@ struct BestDeal {
 struct PricePoint {
     store: String,
     price_chf: f64,
+    is_aggregated: bool,
+    scraped_at: NaiveDateTime,
+}
+
+#[derive(Clone, Serialize, sqlx::FromRow)]
+struct HistoricalRow {
+    chip: String,
+    ram: i32,
+    ssd: i32,
+    cpu_cores: Option<i32>,
+    gpu_cores: Option<i32>,
+    store: String,
+    price_chf: f64,
+    is_aggregated: bool,
     scraped_at: NaiveDateTime,
 }
 
@@ -322,6 +338,7 @@ async fn index(pool: web::Data<PgPool>) -> HttpResponse {
         SELECT DISTINCT ON (p.chip, p.ram, p.ssd, p.cpu_cores, p.gpu_cores)
                p.name as product, s.name as store,
                ph.price_chf::float8 as price_chf, ph.availability,
+               (pl.url LIKE 'https://www.toppreise.ch/%') as is_aggregated,
                ph.scraped_at::timestamp as scraped_at, pl.url,
                p.chip, p.ram, p.ssd, p.cpu_cores, p.gpu_cores
         FROM price_history ph
@@ -344,7 +361,9 @@ async fn index(pool: web::Data<PgPool>) -> HttpResponse {
         SELECT s.name as store, p.name as product,
                p.chip, p.ram, p.ssd, p.cpu_cores, p.gpu_cores,
                ph.price_chf::float8 as price_chf,
-               ph.availability, ph.scraped_at::timestamp as scraped_at, pl.url
+               ph.availability,
+               (pl.url LIKE 'https://www.toppreise.ch/%') as is_aggregated,
+               ph.scraped_at::timestamp as scraped_at, pl.url
         FROM price_history ph
         JOIN product_links pl ON ph.link_id = pl.id
         JOIN products p ON pl.product_id = p.id
@@ -360,12 +379,33 @@ async fn index(pool: web::Data<PgPool>) -> HttpResponse {
     .await
     .unwrap_or_default();
 
+    let history_rows: Vec<HistoricalRow> = sqlx::query_as(
+        r#"
+        SELECT p.chip, p.ram, p.ssd, p.cpu_cores, p.gpu_cores,
+               s.name as store,
+               ph.price_chf::float8 as price_chf,
+               (pl.url LIKE 'https://www.toppreise.ch/%') as is_aggregated,
+               ph.scraped_at::timestamp as scraped_at
+        FROM price_history ph
+        JOIN product_links pl ON ph.link_id = pl.id
+        JOIN products p ON pl.product_id = p.id
+        JOIN stores s ON pl.store_id = s.id
+        WHERE p.chip LIKE 'M4%'
+          AND ph.scraped_at >= NOW() - INTERVAL '30 days'
+        ORDER BY ph.scraped_at ASC
+        "#,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .unwrap_or_default();
+
     let store_health = compute_store_health(&latest);
     let summary = compute_summary(&latest, &store_health);
     let config_insights = compute_config_insights(&latest);
 
     let deals_json = serde_json::to_string(&best_deals).unwrap_or_default();
     let latest_json = serde_json::to_string(&latest).unwrap_or_default();
+    let history_json = serde_json::to_string(&history_rows).unwrap_or_default();
     let summary_json = serde_json::to_string(&summary).unwrap_or_default();
     let store_health_json = serde_json::to_string(&store_health).unwrap_or_default();
     let config_insights_json = serde_json::to_string(&config_insights).unwrap_or_default();
@@ -522,6 +562,23 @@ h1{{font-size:clamp(2rem,4vw,4.2rem);line-height:.95;margin:16px 0 12px;max-widt
 .insight-card h3{{font-size:1rem;margin-bottom:10px}}
 .insight-meta{{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.9rem}}
 .insight-price{{font-size:1.9rem;font-weight:700;margin:8px 0 4px}}
+.control-bar{{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px}}
+.toggle{{display:inline-flex;align-items:center;gap:10px;color:var(--soft);font-size:.92rem}}
+.toggle input{{accent-color:var(--cyan);width:16px;height:16px}}
+.device-grid{{display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px}}
+.device-card{{padding:16px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(180deg, rgba(88,212,255,.05), rgba(255,255,255,.02))}}
+.device-card h3{{font-size:1rem;margin-bottom:10px}}
+.device-top{{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}}
+.device-price{{font-size:1.85rem;font-weight:700;line-height:1}}
+.device-change{{font-size:.88rem;font-weight:700}}
+.device-change.up{{color:var(--lime)}}
+.device-change.down{{color:var(--red)}}
+.device-change.flat{{color:var(--muted)}}
+.sparkline{{width:100%;height:62px;margin:10px 0 8px;display:block}}
+.device-meta{{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.86rem}}
+.device-legend{{display:flex;justify-content:space-between;gap:10px;margin-top:8px;color:var(--muted);font-size:.82rem}}
+.pill{{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:.72rem;background:rgba(255,255,255,.05);color:var(--soft);border:1px solid rgba(255,255,255,.06)}}
+.pill.agg{{color:var(--amber);border-color:rgba(255,180,77,.25);background:rgba(255,180,77,.09)}}
 .table-wrap{{overflow:auto;border:1px solid var(--line);border-radius:18px}}
 table{{width:100%;border-collapse:collapse;min-width:760px}}
 th,td{{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line)}}
@@ -553,9 +610,15 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 .deal-row.active td{{background:rgba(130,168,255,.08)}}
 .inline-chart-row td{{padding:0;background:rgba(255,255,255,.015)}}
 .inline-chart-card{{padding:18px}}
-.inline-chart-head{{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:14px}}
+.inline-chart-head{{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}}
 .inline-chart-head h3{{font-size:1.02rem}}
 .inline-chart-head p{{color:var(--muted);font-size:.9rem}}
+.chart-toolbar{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
+.chart-mode-group{{display:inline-flex;gap:8px;flex-wrap:wrap}}
+.chart-mode-btn{{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--soft);border-radius:999px;padding:8px 12px;font:inherit;font-size:.82rem;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease}}
+.chart-mode-btn:hover{{background:rgba(255,255,255,.07);transform:translateY(-1px)}}
+.chart-mode-btn.active{{background:rgba(88,212,255,.14);border-color:rgba(88,212,255,.38);color:var(--text)}}
+.chart-caption{{font-size:.82rem;color:var(--muted)}}
 .footer{{padding-top:20px;color:var(--muted);font-size:.9rem;text-align:center}}
 @media (max-width: 980px) {{
   .hero,.layout{{grid-template-columns:1fr}}
@@ -591,6 +654,29 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 
   <div class="layout">
     <main class="stack">
+      <section class="panel">
+        <div class="control-bar">
+          <div>
+            <h2>Market Mode</h2>
+            <p class="subtle">Use direct scrapers by default, with optional fallback offers from aggregators.</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="include-aggregated">
+            <span>Include aggregated fallback offers</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel section">
+        <div class="section-head">
+          <div>
+            <h2>Device Tickers</h2>
+            <p>Per-device market cards with current price, 30-day range, and trend sparkline.</p>
+          </div>
+        </div>
+        <div class="device-grid" id="device-stats"></div>
+      </section>
+
       <section class="panel section">
         <div class="section-head">
           <div>
@@ -681,6 +767,7 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 <script>
 const deals = {deals_json};
 const latest = {latest_json};
+const historyRows = {history_json};
 const summary = {summary_json};
 const storeHealth = {store_health_json};
 const insights = {config_insights_json};
@@ -699,6 +786,105 @@ const specLabel = row => {{
   const cores = row.cpu_cores && row.gpu_cores ? ` · ${{row.cpu_cores}}c/${{row.gpu_cores}}c` : '';
   return `${{row.chip}} · ${{row.ram}}GB · ${{storage}}${{cores}}`;
 }};
+const configKey = row => `${{row.chip}}|${{row.ram}}|${{row.ssd}}|${{row.cpu_cores ?? 'na'}}|${{row.gpu_cores ?? 'na'}}`;
+const includeAggregatedInput = document.getElementById('include-aggregated');
+
+function filteredLatestRows() {{
+  return latest.filter(row => includeAggregatedInput.checked || !row.is_aggregated);
+}}
+
+function computeMarketInsights(rows) {{
+  const grouped = new Map();
+  rows.forEach(row => {{
+    const key = configKey(row);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }});
+
+  return [...grouped.entries()].map(([key, items]) => {{
+    const sorted = [...items].sort((a, b) => a.price_chf - b.price_chf);
+    const prices = sorted.map(item => item.price_chf);
+    const mid = Math.floor(prices.length / 2);
+    const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    const spread = worst.price_chf - best.price_chf;
+    return {{
+      key,
+      config_label: specLabel(best),
+      offers: items.length,
+      available_offers: items.filter(item => item.availability).length,
+      best_price: best.price_chf,
+      best_store: best.store,
+      best_url: best.url,
+      best_row: best,
+      median_price: median,
+      worst_price: worst.price_chf,
+      spread_chf: spread,
+      spread_pct: worst.price_chf > 0 ? (spread / worst.price_chf) * 100 : 0,
+    }};
+  }}).sort((a, b) => b.spread_chf - a.spread_chf || a.best_price - b.best_price);
+}}
+
+function sparklineSvg(points) {{
+  if (points.length < 2) return '';
+  const width = 240;
+  const height = 62;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = Math.max(1, max - min);
+  const coords = points.map((value, index) => {{
+    const x = (index / (points.length - 1)) * width;
+    const y = height - ((value - min) / span) * (height - 8) - 4;
+    return `${{index === 0 ? 'M' : 'L'}}${{x.toFixed(1)}},${{y.toFixed(1)}}`;
+  }}).join(' ');
+  return `
+    <svg class="sparkline" viewBox="0 0 ${{width}} ${{height}}" preserveAspectRatio="none">
+      <path d="${{coords}}" fill="none" stroke="#58d4ff" stroke-width="2.5" stroke-linecap="round" />
+    </svg>
+  `;
+}}
+
+function buildDeviceStats(rows) {{
+  const filteredHistory = historyRows.filter(row => includeAggregatedInput.checked || !row.is_aggregated);
+  const byConfig = new Map();
+
+  filteredHistory.forEach(row => {{
+    const key = configKey(row);
+    if (!byConfig.has(key)) byConfig.set(key, []);
+    byConfig.get(key).push(row);
+  }});
+
+  return computeMarketInsights(rows).slice(0, 12).map(item => {{
+    const series = (byConfig.get(item.key) || [])
+      .sort((a, b) => new Date(a.scraped_at) - new Date(b.scraped_at))
+      .reduce((acc, row) => {{
+        const bucket = row.scraped_at;
+        const last = acc[acc.length - 1];
+        if (last && last.bucket === bucket) {{
+          last.price = Math.min(last.price, row.price_chf);
+        }} else {{
+          acc.push({{ bucket, price: row.price_chf }});
+        }}
+        return acc;
+      }}, [])
+      .map(point => point.price)
+      .slice(-20);
+
+    const first = series[0] ?? item.best_price;
+    const current = series[series.length - 1] ?? item.best_price;
+    const deltaPct = first > 0 ? ((current - first) / first) * 100 : 0;
+
+    return {{
+      ...item,
+      current_price: current,
+      low_30d: series.length ? Math.min(...series) : item.best_price,
+      high_30d: series.length ? Math.max(...series) : item.worst_price,
+      delta_pct: deltaPct,
+      sparkline: sparklineSvg(series),
+    }};
+  }});
+}}
 
 document.getElementById('hero-configs').textContent = summary.tracked_configs;
 document.getElementById('hero-fresh').textContent = `${{summary.fresh_stores}} / ${{summary.tracked_stores}}`;
@@ -732,50 +918,413 @@ document.getElementById('store-health').innerHTML = storeHealth.map(store => `
   </article>
 `).join('');
 
-document.getElementById('insights').innerHTML = insights.slice(0, 6).map(item => `
-  <article class="insight-card">
-    <h3>${{item.config_label}}</h3>
-    <div class="insight-meta">
-      <span>${{item.available_offers}} / ${{item.offers}} available</span>
-      <span>${{item.best_store}} leads</span>
-    </div>
-    <div class="insight-price">${{fp(item.best_price)}}</div>
-    <div class="insight-meta">
-      <span>median ${{fp(item.median_price)}}</span>
-      <span>spread ${{fp(item.spread_chf)}} · ${{item.spread_pct.toFixed(1)}}%</span>
-    </div>
-  </article>
-`).join('');
-
-const insightMap = new Map(insights.map(item => [item.key, item]));
 const dealsBody = document.querySelector('#deals tbody');
 let expandedRow = null;
 let expandedChartRow = null;
+let chart = null;
+let currentChartMode = 'stores';
+const chartHistoryCache = new Map();
 
-deals.forEach(deal => {{
-  const key = `${{deal.chip}}|${{deal.ram}}|${{deal.ssd}}|${{deal.cpu_cores ?? 'na'}}|${{deal.gpu_cores ?? 'na'}}`;
-  const insight = insightMap.get(key);
-  const row = document.createElement('tr');
-  row.className = 'deal-row';
-  row.innerHTML = `
-    <td>
-      <div>${{specLabel(deal)}}</div>
-      <div class="subtle mono">${{deal.product}}</div>
-    </td>
-    <td>${{deal.store}}</td>
-    <td class="price good">${{fp(deal.price_chf)}}</td>
-    <td>${{insight ? `${{fp(insight.spread_chf)}} · ${{insight.spread_pct.toFixed(1)}}%` : 'n/a'}}</td>
-    <td>${{insight ? `${{insight.available_offers}} / ${{insight.offers}} live` : 'n/a'}}</td>
-    <td>
-      <span class="status">
-        <span class="dot ${{deal.availability ? 'ok' : 'bad'}}"></span>
-        <span>${{deal.availability ? 'available' : 'unavailable'}} · ${{formatAgo(deal.scraped_at)}}</span>
-      </span>
-    </td>
-  `;
-  row.addEventListener('click', () => loadChart(deal, row));
-  dealsBody.appendChild(row);
-}});
+function historyKey(deal) {{
+  return configKey(deal);
+}}
+
+function chartPalette(store) {{
+  const colors = {{
+    'Apple Store':'#82a8ff',
+    'Brack':'#58d4ff',
+    'Fust':'#ffb44d',
+    'Galaxus':'#8df07c',
+    'DQ Solutions':'#b68cff',
+    'Tutti':'#ff8d6d',
+    'Ricardo':'#ff6f61'
+  }};
+  return colors[store] || '#cdd6e1';
+}}
+
+function normalizeHistoryRows(data) {{
+  return data
+    .filter(point => includeAggregatedInput.checked || !point.is_aggregated)
+    .map(point => ({{
+      ...point,
+      timestamp: new Date(point.scraped_at),
+    }}))
+    .sort((a, b) => a.timestamp - b.timestamp);
+}}
+
+function buildStoreDatasets(data) {{
+  const stores = [...new Set(data.map(point => point.store))];
+  return stores.map(store => ({{
+    label: store,
+    data: data
+      .filter(point => point.store === store)
+      .map(point => ({{ x: point.timestamp, y: point.price_chf }})),
+    borderColor: chartPalette(store),
+    backgroundColor: chartPalette(store),
+    borderWidth: 2,
+    pointRadius: 3,
+    pointHoverRadius: 5,
+    tension: 0.25,
+    fill: false
+  }}));
+}}
+
+function buildMarketSnapshots(data) {{
+  const snapshots = new Map();
+  data.forEach(point => {{
+    const key = point.timestamp.toISOString();
+    const prev = snapshots.get(key);
+    if (!prev || point.price_chf < prev.price) {{
+      snapshots.set(key, {{ time: point.timestamp, price: point.price_chf }});
+    }}
+  }});
+
+  return [...snapshots.values()].sort((a, b) => a.time - b.time);
+}}
+
+function buildDailyOhlc(data) {{
+  const snapshots = buildMarketSnapshots(data);
+  const grouped = new Map();
+
+  snapshots.forEach(point => {{
+    const day = point.time.toISOString().slice(0, 10);
+    if (!grouped.has(day)) grouped.set(day, []);
+    grouped.get(day).push(point);
+  }});
+
+  return [...grouped.entries()].map(([day, points]) => {{
+    const prices = points.map(point => point.price);
+    return {{
+      day,
+      date: new Date(`${{day}}T12:00:00Z`),
+      open: points[0].price,
+      close: points[points.length - 1].price,
+      low: Math.min(...prices),
+      high: Math.max(...prices),
+    }};
+  }});
+}}
+
+function chartCaption(mode) {{
+  if (mode === 'range') return 'Daily market band based on best available price snapshots.';
+  if (mode === 'ohlc') return 'Stock-style daily OHLC view of the best market price.';
+  return 'Multi-store line chart for the exact configuration.';
+}}
+
+function buildChartConfig(mode, rawData) {{
+  const data = normalizeHistoryRows(rawData);
+  if (!data.length) return null;
+
+  if (mode === 'range') {{
+    const daily = buildDailyOhlc(data);
+    return {{
+      type: 'line',
+      data: {{
+        datasets: [
+          {{
+            label: 'Daily low',
+            data: daily.map(point => ({{ x: point.date, y: point.low }})),
+            borderColor: 'rgba(88,212,255,0)',
+            backgroundColor: 'rgba(88,212,255,.18)',
+            pointRadius: 0,
+            fill: false
+          }},
+          {{
+            label: 'Daily high',
+            data: daily.map(point => ({{ x: point.date, y: point.high }})),
+            borderColor: 'rgba(88,212,255,.45)',
+            backgroundColor: 'rgba(88,212,255,.18)',
+            pointRadius: 0,
+            borderWidth: 1.5,
+            fill: '-1',
+            tension: 0.2
+          }},
+          {{
+            label: 'Close',
+            data: daily.map(point => ({{ x: point.date, y: point.close }})),
+            borderColor: '#8df07c',
+            backgroundColor: '#8df07c',
+            borderWidth: 2.4,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            tension: 0.22,
+            fill: false
+          }}
+        ]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {{ mode: 'index', intersect: false }},
+        plugins: {{
+          legend: {{ labels: {{ color: '#cdd6e1' }} }},
+          tooltip: {{
+            callbacks: {{
+              label: context => `${{context.dataset.label}}: CHF ${{context.parsed.y.toFixed(2)}}`
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            type: 'time',
+            time: {{ unit: 'day', tooltipFormat: 'PP' }},
+            ticks: {{ color: '#9aa4b2' }},
+            grid: {{ color: 'rgba(255,255,255,.07)' }}
+          }},
+          y: {{
+            ticks: {{
+              color: '#9aa4b2',
+              callback: value => `CHF ${{value}}`
+            }},
+            grid: {{ color: 'rgba(255,255,255,.07)' }}
+          }}
+        }}
+      }}
+    }};
+  }}
+
+  if (mode === 'ohlc') {{
+    const daily = buildDailyOhlc(data);
+    const bodyColors = daily.map(point => point.close >= point.open ? '#8df07c' : '#ff6f61');
+    return {{
+      type: 'bar',
+      data: {{
+        datasets: [
+          {{
+            type: 'bar',
+            label: 'Range',
+            data: daily.map(point => ({{ x: point.date, y: [point.low, point.high] }})),
+            backgroundColor: 'rgba(130,168,255,.18)',
+            borderColor: 'rgba(130,168,255,.45)',
+            borderWidth: 1,
+            borderSkipped: false,
+            barPercentage: 0.18,
+            categoryPercentage: 0.9,
+            order: 3
+          }},
+          {{
+            type: 'bar',
+            label: 'Open / Close',
+            data: daily.map(point => ({{ x: point.date, y: [Math.min(point.open, point.close), Math.max(point.open, point.close)] }})),
+            backgroundColor: bodyColors,
+            borderColor: bodyColors,
+            borderWidth: 1,
+            borderSkipped: false,
+            barPercentage: 0.52,
+            categoryPercentage: 0.9,
+            order: 2
+          }},
+          {{
+            type: 'line',
+            label: 'Close',
+            data: daily.map(point => ({{ x: point.date, y: point.close }})),
+            borderColor: '#eef2ff',
+            backgroundColor: '#eef2ff',
+            borderWidth: 1.5,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            tension: 0,
+            fill: false,
+            order: 1
+          }}
+        ]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {{ mode: 'index', intersect: false }},
+        plugins: {{
+          legend: {{ labels: {{ color: '#cdd6e1' }} }},
+          tooltip: {{
+            callbacks: {{
+              afterBody: items => {{
+                const idx = items?.[0]?.dataIndex;
+                const point = daily[idx];
+                if (!point) return '';
+                return [
+                  `Open: CHF ${{point.open.toFixed(2)}}`,
+                  `High: CHF ${{point.high.toFixed(2)}}`,
+                  `Low: CHF ${{point.low.toFixed(2)}}`,
+                  `Close: CHF ${{point.close.toFixed(2)}}`
+                ];
+              }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            type: 'time',
+            time: {{ unit: 'day', tooltipFormat: 'PP' }},
+            ticks: {{ color: '#9aa4b2' }},
+            grid: {{ color: 'rgba(255,255,255,.07)' }}
+          }},
+          y: {{
+            ticks: {{
+              color: '#9aa4b2',
+              callback: value => `CHF ${{value}}`
+            }},
+            grid: {{ color: 'rgba(255,255,255,.07)' }}
+          }}
+        }}
+      }}
+    }};
+  }}
+
+  return {{
+    type: 'line',
+    data: {{
+      datasets: buildStoreDatasets(data)
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {{ mode: 'index', intersect: false }},
+      plugins: {{
+        legend: {{ labels: {{ color: '#cdd6e1' }} }},
+        tooltip: {{
+          callbacks: {{
+            label: context => `${{context.dataset.label}}: CHF ${{context.parsed.y.toFixed(2)}}`
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{
+          type: 'time',
+          time: {{ unit: 'day', tooltipFormat: 'PPp' }},
+          ticks: {{ color: '#9aa4b2' }},
+          grid: {{ color: 'rgba(255,255,255,.07)' }}
+        }},
+        y: {{
+          ticks: {{
+            color: '#9aa4b2',
+            callback: value => `CHF ${{value}}`
+          }},
+          grid: {{ color: 'rgba(255,255,255,.07)' }}
+        }}
+      }}
+    }}
+  }};
+}}
+
+function activateChartMode(chartRow, mode) {{
+  chartRow.querySelectorAll('.chart-mode-btn').forEach(button => {{
+    button.classList.toggle('active', button.dataset.mode === mode);
+  }});
+  const caption = chartRow.querySelector('.chart-caption');
+  if (caption) caption.textContent = chartCaption(mode);
+}}
+
+function renderExpandedChart(chartRow, rawData, mode) {{
+  const shell = chartRow.querySelector('.chart-shell');
+  const config = buildChartConfig(mode, rawData);
+  activateChartMode(chartRow, mode);
+
+  if (!config) {{
+    shell.innerHTML = '<div class="loading">No history available for this view.</div>';
+    if (chart) {{
+      chart.destroy();
+      chart = null;
+    }}
+    return;
+  }}
+
+  shell.innerHTML = '<canvas></canvas>';
+  const ctx = shell.querySelector('canvas');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, config);
+}}
+
+function renderDeviceStats(rows) {{
+  const cards = buildDeviceStats(rows);
+  document.getElementById('device-stats').innerHTML = cards.map(item => {{
+    const changeClass = item.delta_pct < -0.1 ? 'up' : item.delta_pct > 0.1 ? 'down' : 'flat';
+    const changeLabel = `${{item.delta_pct >= 0 ? '+' : ''}}${{item.delta_pct.toFixed(1)}}%`;
+    return `
+      <article class="device-card">
+        <div class="device-top">
+          <div>
+            <h3>${{item.config_label}}</h3>
+            <div class="device-price">${{fp(item.current_price)}}</div>
+          </div>
+          <div class="device-change ${{changeClass}}">${{changeLabel}}</div>
+        </div>
+        ${{item.sparkline}}
+        <div class="device-meta">
+          <span>Best: ${{item.best_store}}</span>
+          <span>${{item.available_offers}} / ${{item.offers}} live</span>
+        </div>
+        <div class="device-legend">
+          <span>30d low ${{fp(item.low_30d)}}</span>
+          <span>30d high ${{fp(item.high_30d)}}</span>
+        </div>
+      </article>
+    `;
+  }}).join('');
+}}
+
+function renderInsights(rows) {{
+  document.getElementById('insights').innerHTML = computeMarketInsights(rows).slice(0, 6).map(item => `
+    <article class="insight-card">
+      <h3>${{item.config_label}}</h3>
+      <div class="insight-meta">
+        <span>${{item.available_offers}} / ${{item.offers}} available</span>
+        <span>${{item.best_store}} leads</span>
+      </div>
+      <div class="insight-price">${{fp(item.best_price)}}</div>
+      <div class="insight-meta">
+        <span>median ${{fp(item.median_price)}}</span>
+        <span>spread ${{fp(item.spread_chf)}} · ${{item.spread_pct.toFixed(1)}}%</span>
+      </div>
+    </article>
+  `).join('');
+}}
+
+function renderDeals() {{
+  const rows = filteredLatestRows();
+  const insightsMap = new Map(computeMarketInsights(rows).map(item => [item.key, item]));
+  dealsBody.innerHTML = '';
+  if (expandedChartRow) {{
+    expandedChartRow.remove();
+    expandedChartRow = null;
+  }}
+  if (expandedRow) {{
+    expandedRow.classList.remove('active');
+    expandedRow = null;
+  }}
+  if (chart) {{
+    chart.destroy();
+    chart = null;
+  }}
+
+  [...insightsMap.values()]
+    .sort((a, b) => a.best_price - b.best_price || b.available_offers - a.available_offers)
+    .forEach(item => {{
+      const deal = item.best_row;
+      const row = document.createElement('tr');
+      row.className = 'deal-row';
+      row.innerHTML = `
+        <td>
+          <div>${{item.config_label}}</div>
+          <div class="subtle mono">${{deal.product}}</div>
+        </td>
+        <td>${{deal.store}}${{deal.is_aggregated ? ' <span class="pill agg">aggregated</span>' : ''}}</td>
+        <td class="price good">${{fp(deal.price_chf)}}</td>
+        <td>${{fp(item.spread_chf)}} · ${{item.spread_pct.toFixed(1)}}%</td>
+        <td>${{item.available_offers}} / ${{item.offers}} live</td>
+        <td>
+          <span class="status">
+            <span class="dot ${{deal.availability ? 'ok' : 'bad'}}"></span>
+            <span>${{deal.availability ? 'available' : 'unavailable'}} · ${{formatAgo(deal.scraped_at)}}</span>
+          </span>
+        </td>
+      `;
+      row.addEventListener('click', () => loadChart(deal, row));
+      dealsBody.appendChild(row);
+    }});
+
+  renderInsights(rows);
+  renderDeviceStats(rows);
+}}
 
 const fSearch = document.getElementById('f-search');
 const fChip = document.getElementById('f-chip');
@@ -802,7 +1351,7 @@ function renderPrices() {{
   const ssd = fSsd.value;
   const status = fStatus.value;
 
-  let rows = latest.slice();
+  let rows = filteredLatestRows();
   if (search) {{
     rows = rows.filter(row =>
       row.product.toLowerCase().includes(search) ||
@@ -843,9 +1392,13 @@ function renderPrices() {{
   input.addEventListener('input', renderPrices);
   input.addEventListener('change', renderPrices);
 }});
+includeAggregatedInput.addEventListener('change', () => {{
+  renderDeals();
+  renderPrices();
+}});
+renderDeals();
 renderPrices();
 
-let chart = null;
 async function loadChart(deal, rowElement) {{
   if (expandedRow === rowElement && expandedChartRow) {{
     expandedRow.classList.remove('active');
@@ -879,6 +1432,14 @@ async function loadChart(deal, rowElement) {{
             <h3>Price History · ${{specLabel(deal)}}</h3>
             <p>${{deal.store}} currently leads at ${{fp(deal.price_chf)}}</p>
           </div>
+          <div class="chart-toolbar">
+            <div class="chart-mode-group">
+              <button class="chart-mode-btn active" type="button" data-mode="stores">Stores</button>
+              <button class="chart-mode-btn" type="button" data-mode="range">Range</button>
+              <button class="chart-mode-btn" type="button" data-mode="ohlc">OHLC</button>
+            </div>
+            <div class="chart-caption">${{chartCaption(currentChartMode)}}</div>
+          </div>
         </div>
         <div class="chart-shell"><div class="loading">Loading history…</div></div>
       </div>
@@ -886,7 +1447,16 @@ async function loadChart(deal, rowElement) {{
   `;
   rowElement.insertAdjacentElement('afterend', chartRow);
   expandedChartRow = chartRow;
-  const shell = chartRow.querySelector('.chart-shell');
+
+  chartRow.querySelectorAll('.chart-mode-btn').forEach(button => {{
+    button.addEventListener('click', () => {{
+      currentChartMode = button.dataset.mode;
+      const cached = chartHistoryCache.get(historyKey(deal));
+      if (cached && expandedChartRow === chartRow) {{
+        renderExpandedChart(chartRow, cached, currentChartMode);
+      }}
+    }});
+  }});
 
   const params = new URLSearchParams({{
     chip: deal.chip,
@@ -898,69 +1468,10 @@ async function loadChart(deal, rowElement) {{
 
   const response = await fetch(`/api/history?${{params.toString()}}`);
   const data = await response.json();
+  chartHistoryCache.set(historyKey(deal), data);
 
   if (expandedChartRow !== chartRow) return;
-
-  shell.innerHTML = '<canvas></canvas>';
-  const ctx = shell.querySelector('canvas');
-  const colors = {{
-    'Apple Store':'#82a8ff',
-    'Brack':'#58d4ff',
-    'Fust':'#ffb44d',
-    'Galaxus':'#8df07c',
-    'DQ Solutions':'#b68cff',
-    'Tutti':'#ff8d6d',
-    'Ricardo':'#ff6f61'
-  }};
-
-  const stores = [...new Set(data.map(point => point.store))];
-  const datasets = stores.map(store => ({{
-    label: store,
-    data: data
-      .filter(point => point.store === store)
-      .map(point => ({{ x: new Date(point.scraped_at), y: point.price_chf }})),
-    borderColor: colors[store] || '#cdd6e1',
-    backgroundColor: colors[store] || '#cdd6e1',
-    borderWidth: 2,
-    pointRadius: 3,
-    pointHoverRadius: 5,
-    tension: 0.25,
-    fill: false
-  }}));
-
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {{
-    type: 'line',
-    data: {{ datasets }},
-    options: {{
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {{ mode: 'index', intersect: false }},
-      plugins: {{
-        legend: {{ labels: {{ color: '#cdd6e1' }} }},
-        tooltip: {{
-          callbacks: {{
-            label: context => `${{context.dataset.label}}: CHF ${{context.parsed.y.toFixed(2)}}`
-          }}
-        }}
-      }},
-      scales: {{
-        x: {{
-          type: 'time',
-          time: {{ unit: 'day', tooltipFormat: 'PPp' }},
-          ticks: {{ color: '#9aa4b2' }},
-          grid: {{ color: 'rgba(255,255,255,.07)' }}
-        }},
-        y: {{
-          ticks: {{
-            color: '#9aa4b2',
-            callback: value => `CHF ${{value}}`
-          }},
-          grid: {{ color: 'rgba(255,255,255,.07)' }}
-        }}
-      }}
-    }}
-  }});
+  renderExpandedChart(chartRow, data, currentChartMode);
 }}
 
 setTimeout(() => location.reload(), 300000);
@@ -1002,6 +1513,7 @@ async fn api_history(pool: web::Data<PgPool>, query: web::Query<HistoryQuery>) -
         r#"
         SELECT s.name as store,
                ph.price_chf::float8 as price_chf,
+               (pl.url LIKE 'https://www.toppreise.ch/%') as is_aggregated,
                ph.scraped_at::timestamp as scraped_at
         FROM price_history ph
         JOIN product_links pl ON ph.link_id = pl.id

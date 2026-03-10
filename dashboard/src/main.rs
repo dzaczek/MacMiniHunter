@@ -449,6 +449,44 @@ body{{
     linear-gradient(180deg, #0b0d12 0%, var(--bg) 38%, #0b0d12 100%);
   min-height:100vh;
 }}
+body[data-theme="geek"]{{
+  --bg:#0b1116;
+  --bg-alt:#101a22;
+  --card:#111c26;
+  --card-strong:#162433;
+  --line:rgba(122, 240, 255, .14);
+  --text:#ecfffe;
+  --muted:#8bb8c0;
+  --soft:#d4fbff;
+  --lime:#74f8cf;
+  --amber:#ffd166;
+  --red:#ff6b8e;
+  --cyan:#4ef2ff;
+  --blue:#7cc6ff;
+  background:
+    radial-gradient(circle at top left, rgba(78,242,255,.2), transparent 30%),
+    radial-gradient(circle at top right, rgba(116,248,207,.15), transparent 28%),
+    linear-gradient(180deg, #071018 0%, var(--bg) 40%, #081018 100%);
+}}
+body[data-theme="ultra-geek"]{{
+  --bg:#090b09;
+  --bg-alt:#11150d;
+  --card:#0f140d;
+  --card-strong:#141b10;
+  --line:rgba(201,255,92,.18);
+  --text:#f4ffd7;
+  --muted:#b1c08b;
+  --soft:#f0ffc2;
+  --lime:#c9ff5c;
+  --amber:#ffe66d;
+  --red:#ff7f50;
+  --cyan:#7df9ff;
+  --blue:#9bd4ff;
+  background:
+    radial-gradient(circle at top left, rgba(201,255,92,.16), transparent 26%),
+    radial-gradient(circle at top right, rgba(125,249,255,.12), transparent 26%),
+    linear-gradient(180deg, #060706 0%, var(--bg) 42%, #070806 100%);
+}}
 a{{color:inherit;text-decoration:none}}
 .page{{max-width:1280px;margin:0 auto;padding:28px 20px 48px}}
 .hero{{
@@ -537,7 +575,11 @@ h1{{font-size:clamp(2rem,4vw,4.2rem);line-height:.95;margin:16px 0 12px;max-widt
   background:var(--card);
   border:1px solid var(--line);
   border-radius:18px;
+  cursor:pointer;
+  transition:border-color .18s ease, transform .18s ease, background .18s ease;
 }}
+.store-card:hover{{transform:translateY(-1px);border-color:rgba(88,212,255,.28)}}
+.store-card.active{{border-color:rgba(88,212,255,.42);background:linear-gradient(180deg, rgba(88,212,255,.08), rgba(255,255,255,.02))}}
 .store-top{{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}}
 .store-name{{font-weight:700}}
 .badge{{
@@ -565,6 +607,9 @@ h1{{font-size:clamp(2rem,4vw,4.2rem);line-height:.95;margin:16px 0 12px;max-widt
 .control-bar{{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px}}
 .toggle{{display:inline-flex;align-items:center;gap:10px;color:var(--soft);font-size:.92rem}}
 .toggle input{{accent-color:var(--cyan);width:16px;height:16px}}
+.control-actions{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}}
+.theme-switch{{display:inline-flex;align-items:center;gap:10px;color:var(--soft);font-size:.92rem}}
+.theme-switch select{{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:9px 12px;font:inherit}}
 .device-grid{{display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px}}
 .device-card{{padding:16px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(180deg, rgba(88,212,255,.05), rgba(255,255,255,.02))}}
 .device-card h3{{font-size:1rem;margin-bottom:10px}}
@@ -589,7 +634,7 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 .price.hot{{color:var(--amber)}}
 .mono{{font-family:'IBM Plex Mono',monospace}}
 .subtle{{color:var(--muted)}}
-.filters{{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:10px;margin-bottom:14px}}
+.filters{{display:grid;grid-template-columns:repeat(7, minmax(0, 1fr));gap:10px;margin-bottom:14px}}
 .filters label{{display:flex;flex-direction:column;gap:6px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}}
 .filters input,.filters select{{
   border:1px solid var(--line);
@@ -602,6 +647,12 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 .filters input:focus,.filters select:focus{{outline:none;border-color:rgba(88,212,255,.45)}}
 .toolbar{{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}}
 .toolbar .result{{color:var(--muted);font-size:.92rem}}
+.toolbar-actions{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
+.toolbar-btn{{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--soft);border-radius:999px;padding:8px 12px;font:inherit;font-size:.82rem;cursor:pointer}}
+.toolbar-btn:hover{{background:rgba(255,255,255,.07)}}
+.toolbar-btn.hidden{{display:none}}
+.source-chip{{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);font-size:.82rem;color:var(--soft)}}
+.source-chip.marketplace{{color:var(--amber);border-color:rgba(255,180,77,.24);background:rgba(255,180,77,.08)}}
 .chart-shell{{height:340px;border:1px solid var(--line);border-radius:18px;padding:12px;background:var(--card)}}
 .loading{{height:100%;display:grid;place-items:center;color:var(--muted)}}
 .status{{display:inline-flex;align-items:center;gap:8px}}
@@ -615,6 +666,7 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 .inline-chart-head p{{color:var(--muted);font-size:.9rem}}
 .chart-toolbar{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
 .chart-mode-group{{display:inline-flex;gap:8px;flex-wrap:wrap}}
+.chart-range-group{{display:inline-flex;gap:8px;flex-wrap:wrap}}
 .chart-mode-btn{{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--soft);border-radius:999px;padding:8px 12px;font:inherit;font-size:.82rem;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease}}
 .chart-mode-btn:hover{{background:rgba(255,255,255,.07);transform:translateY(-1px)}}
 .chart-mode-btn.active{{background:rgba(88,212,255,.14);border-color:rgba(88,212,255,.38);color:var(--text)}}
@@ -660,10 +712,20 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
             <h2>Market Mode</h2>
             <p class="subtle">Use direct scrapers by default, with optional fallback offers from aggregators.</p>
           </div>
-          <label class="toggle">
-            <input type="checkbox" id="include-aggregated">
-            <span>Include aggregated fallback offers</span>
-          </label>
+          <div class="control-actions">
+            <label class="theme-switch">
+              <span>Theme</span>
+              <select id="theme-select">
+                <option value="default">Default</option>
+                <option value="geek">Geek Theme</option>
+                <option value="ultra-geek">Ultra Geek Theme</option>
+              </select>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="include-aggregated">
+              <span>Include aggregated fallback offers</span>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -714,11 +776,17 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
           <label>Chip<select id="f-chip"><option value="">All</option></select></label>
           <label>RAM<select id="f-ram"><option value="">All</option></select></label>
           <label>SSD<select id="f-ssd"><option value="">All</option></select></label>
+          <label>CPU<select id="f-cpu"><option value="">All</option></select></label>
+          <label>GPU<select id="f-gpu"><option value="">All</option></select></label>
           <label>Status<select id="f-status"><option value="">All</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
         </div>
         <div class="toolbar">
           <div class="result" id="price-count"></div>
-          <div class="result">Auto-refresh every 5 minutes</div>
+          <div class="toolbar-actions">
+            <div class="source-chip hidden" id="active-store-chip"></div>
+            <button class="toolbar-btn hidden" id="clear-store-filter" type="button">Clear store filter</button>
+            <div class="result">Auto-refresh every 5 minutes</div>
+          </div>
         </div>
         <div class="table-wrap">
           <table id="prices">
@@ -773,6 +841,7 @@ const storeHealth = {store_health_json};
 const insights = {config_insights_json};
 
 const fp = value => `CHF ${{value.toFixed(2)}}`;
+const marketplaceSources = new Set(['Ricardo', 'Tutti']);
 const formatAgo = value => {{
   const date = new Date(value);
   const now = new Date();
@@ -788,9 +857,46 @@ const specLabel = row => {{
 }};
 const configKey = row => `${{row.chip}}|${{row.ram}}|${{row.ssd}}|${{row.cpu_cores ?? 'na'}}|${{row.gpu_cores ?? 'na'}}`;
 const includeAggregatedInput = document.getElementById('include-aggregated');
+const themeSelect = document.getElementById('theme-select');
+const storeHealthContainer = document.getElementById('store-health');
+const clearStoreFilterButton = document.getElementById('clear-store-filter');
+const activeStoreChip = document.getElementById('active-store-chip');
+let selectedStore = '';
+
+function applyTheme(theme) {{
+  const resolved = theme === 'geek' || theme === 'ultra-geek' ? theme : 'default';
+  if (resolved === 'default') {{
+    delete document.body.dataset.theme;
+  }} else {{
+    document.body.dataset.theme = resolved;
+  }}
+  themeSelect.value = resolved;
+  localStorage.setItem('mminihunter-theme', resolved);
+}}
 
 function filteredLatestRows() {{
   return latest.filter(row => includeAggregatedInput.checked || !row.is_aggregated);
+}}
+
+function updateStoreSelectionUI() {{
+  storeHealthContainer.querySelectorAll('.store-card').forEach(card => {{
+    card.classList.toggle('active', card.dataset.store === selectedStore);
+  }});
+
+  if (!selectedStore) {{
+    clearStoreFilterButton.classList.add('hidden');
+    activeStoreChip.classList.add('hidden');
+    activeStoreChip.textContent = '';
+    activeStoreChip.classList.remove('marketplace');
+    return;
+  }}
+
+  clearStoreFilterButton.classList.remove('hidden');
+  activeStoreChip.classList.remove('hidden');
+  activeStoreChip.classList.toggle('marketplace', marketplaceSources.has(selectedStore));
+  activeStoreChip.textContent = marketplaceSources.has(selectedStore)
+    ? `${{selectedStore}} marketplace feed`
+    : `${{selectedStore}} source filter`;
 }}
 
 function computeMarketInsights(rows) {{
@@ -906,7 +1012,7 @@ document.getElementById('stats').innerHTML = stats.map(card => `
 `).join('');
 
 document.getElementById('store-health').innerHTML = storeHealth.map(store => `
-  <article class="store-card">
+  <article class="store-card" data-store="${{store.store}}">
     <div class="store-top">
       <div class="store-name">${{store.store}}</div>
       <span class="badge ${{store.freshness}}">${{store.freshness}}</span>
@@ -923,6 +1029,7 @@ let expandedRow = null;
 let expandedChartRow = null;
 let chart = null;
 let currentChartMode = 'stores';
+let currentChartRange = '7d';
 const chartHistoryCache = new Map();
 
 function historyKey(deal) {{
@@ -952,6 +1059,15 @@ function normalizeHistoryRows(data) {{
     .sort((a, b) => a.timestamp - b.timestamp);
 }}
 
+function filterHistoryByRange(data, range) {{
+  if (range === 'all') return data;
+  const latest = data[data.length - 1]?.timestamp;
+  if (!latest) return data;
+  const days = range === '1d' ? 1 : range === '7d' ? 7 : 30;
+  const cutoff = new Date(latest.getTime() - (days * 24 * 60 * 60 * 1000));
+  return data.filter(point => point.timestamp >= cutoff);
+}}
+
 function buildStoreDatasets(data) {{
   const stores = [...new Set(data.map(point => point.store))];
   return stores.map(store => ({{
@@ -964,7 +1080,7 @@ function buildStoreDatasets(data) {{
     borderWidth: 2,
     pointRadius: 3,
     pointHoverRadius: 5,
-    tension: 0.25,
+    tension: 0,
     fill: false
   }}));
 }}
@@ -1012,7 +1128,7 @@ function chartCaption(mode) {{
 }}
 
 function buildChartConfig(mode, rawData) {{
-  const data = normalizeHistoryRows(rawData);
+  const data = filterHistoryByRange(normalizeHistoryRows(rawData), currentChartRange);
   if (!data.length) return null;
 
   if (mode === 'range') {{
@@ -1037,7 +1153,7 @@ function buildChartConfig(mode, rawData) {{
             pointRadius: 0,
             borderWidth: 1.5,
             fill: '-1',
-            tension: 0.2
+            tension: 0
           }},
           {{
             label: 'Close',
@@ -1047,7 +1163,7 @@ function buildChartConfig(mode, rawData) {{
             borderWidth: 2.4,
             pointRadius: 2,
             pointHoverRadius: 4,
-            tension: 0.22,
+            tension: 0,
             fill: false
           }}
         ]
@@ -1206,9 +1322,12 @@ function buildChartConfig(mode, rawData) {{
   }};
 }}
 
-function activateChartMode(chartRow, mode) {{
+function activateChartControls(chartRow, mode, range) {{
   chartRow.querySelectorAll('.chart-mode-btn').forEach(button => {{
     button.classList.toggle('active', button.dataset.mode === mode);
+  }});
+  chartRow.querySelectorAll('.chart-range-btn').forEach(button => {{
+    button.classList.toggle('active', button.dataset.range === range);
   }});
   const caption = chartRow.querySelector('.chart-caption');
   if (caption) caption.textContent = chartCaption(mode);
@@ -1217,7 +1336,7 @@ function activateChartMode(chartRow, mode) {{
 function renderExpandedChart(chartRow, rawData, mode) {{
   const shell = chartRow.querySelector('.chart-shell');
   const config = buildChartConfig(mode, rawData);
-  activateChartMode(chartRow, mode);
+  activateChartControls(chartRow, mode, currentChartRange);
 
   if (!config) {{
     shell.innerHTML = '<div class="loading">No history available for this view.</div>';
@@ -1330,6 +1449,8 @@ const fSearch = document.getElementById('f-search');
 const fChip = document.getElementById('f-chip');
 const fRam = document.getElementById('f-ram');
 const fSsd = document.getElementById('f-ssd');
+const fCpu = document.getElementById('f-cpu');
+const fGpu = document.getElementById('f-gpu');
 const fStatus = document.getElementById('f-status');
 
 [...new Set(latest.map(row => row.chip))].sort().forEach(value => {{
@@ -1342,6 +1463,12 @@ const fStatus = document.getElementById('f-status');
   const label = value >= 1000 ? `${{value / 1000}}TB` : `${{value}}GB`;
   fSsd.innerHTML += `<option value="${{value}}">${{label}}</option>`;
 }});
+[...new Set(latest.map(row => row.cpu_cores).filter(value => value !== null))].sort((a, b) => a - b).forEach(value => {{
+  fCpu.innerHTML += `<option value="${{value}}">${{value}}c</option>`;
+}});
+[...new Set(latest.map(row => row.gpu_cores).filter(value => value !== null))].sort((a, b) => a - b).forEach(value => {{
+  fGpu.innerHTML += `<option value="${{value}}">${{value}}c</option>`;
+}});
 
 const pricesBody = document.querySelector('#prices tbody');
 function renderPrices() {{
@@ -1349,6 +1476,8 @@ function renderPrices() {{
   const chip = fChip.value;
   const ram = fRam.value;
   const ssd = fSsd.value;
+  const cpu = fCpu.value;
+  const gpu = fGpu.value;
   const status = fStatus.value;
 
   let rows = filteredLatestRows();
@@ -1358,19 +1487,28 @@ function renderPrices() {{
       row.store.toLowerCase().includes(search)
     );
   }}
+  if (selectedStore) rows = rows.filter(row => row.store === selectedStore);
   if (chip) rows = rows.filter(row => row.chip === chip);
   if (ram) rows = rows.filter(row => row.ram === Number(ram));
   if (ssd) rows = rows.filter(row => row.ssd === Number(ssd));
+  if (cpu) rows = rows.filter(row => row.cpu_cores === Number(cpu));
+  if (gpu) rows = rows.filter(row => row.gpu_cores === Number(gpu));
   if (status === 'available') rows = rows.filter(row => row.availability);
   if (status === 'unavailable') rows = rows.filter(row => !row.availability);
 
   rows.sort((a, b) => {{
+    if (selectedStore && marketplaceSources.has(selectedStore)) {{
+      return new Date(b.scraped_at) - new Date(a.scraped_at) || a.price_chf - b.price_chf;
+    }}
     if (a.availability !== b.availability) return Number(b.availability) - Number(a.availability);
     if (a.price_chf !== b.price_chf) return a.price_chf - b.price_chf;
     return new Date(b.scraped_at) - new Date(a.scraped_at);
   }});
 
-  document.getElementById('price-count').textContent = `${{rows.length}} offers visible`;
+  const countLabel = selectedStore
+    ? `${{rows.length}} offers visible from ${{selectedStore}}`
+    : `${{rows.length}} offers visible`;
+  document.getElementById('price-count').textContent = countLabel;
   pricesBody.innerHTML = rows.map(row => `
     <tr>
       <td>
@@ -1388,14 +1526,31 @@ function renderPrices() {{
   `).join('');
 }}
 
-[fSearch, fChip, fRam, fSsd, fStatus].forEach(input => {{
+[fSearch, fChip, fRam, fSsd, fCpu, fGpu, fStatus].forEach(input => {{
   input.addEventListener('input', renderPrices);
   input.addEventListener('change', renderPrices);
+}});
+themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+storeHealthContainer.querySelectorAll('.store-card').forEach(card => {{
+  card.addEventListener('click', () => {{
+    const nextStore = card.dataset.store;
+    selectedStore = selectedStore === nextStore ? '' : nextStore;
+    updateStoreSelectionUI();
+    renderPrices();
+    document.getElementById('prices').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+  }});
+}});
+clearStoreFilterButton.addEventListener('click', () => {{
+  selectedStore = '';
+  updateStoreSelectionUI();
+  renderPrices();
 }});
 includeAggregatedInput.addEventListener('change', () => {{
   renderDeals();
   renderPrices();
 }});
+applyTheme(localStorage.getItem('mminihunter-theme') || 'default');
+updateStoreSelectionUI();
 renderDeals();
 renderPrices();
 
@@ -1438,6 +1593,12 @@ async function loadChart(deal, rowElement) {{
               <button class="chart-mode-btn" type="button" data-mode="range">Range</button>
               <button class="chart-mode-btn" type="button" data-mode="ohlc">OHLC</button>
             </div>
+            <div class="chart-range-group">
+              <button class="chart-mode-btn chart-range-btn" type="button" data-range="1d">1D</button>
+              <button class="chart-mode-btn chart-range-btn active" type="button" data-range="7d">7D</button>
+              <button class="chart-mode-btn chart-range-btn" type="button" data-range="30d">30D</button>
+              <button class="chart-mode-btn chart-range-btn" type="button" data-range="all">All</button>
+            </div>
             <div class="chart-caption">${{chartCaption(currentChartMode)}}</div>
           </div>
         </div>
@@ -1450,7 +1611,8 @@ async function loadChart(deal, rowElement) {{
 
   chartRow.querySelectorAll('.chart-mode-btn').forEach(button => {{
     button.addEventListener('click', () => {{
-      currentChartMode = button.dataset.mode;
+      if (button.dataset.mode) currentChartMode = button.dataset.mode;
+      if (button.dataset.range) currentChartRange = button.dataset.range;
       const cached = chartHistoryCache.get(historyKey(deal));
       if (cached && expandedChartRow === chartRow) {{
         renderExpandedChart(chartRow, cached, currentChartMode);

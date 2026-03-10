@@ -15,8 +15,16 @@ import re
 from typing import Optional
 from urllib.parse import parse_qs, urljoin, urlparse
 
-from src.utils.stealth import random_delay, get_random_user_agent
-from src.utils.validators import ScrapedPrice, parse_specs_from_title
+from src.utils.stealth import (
+    build_headers_for_profile,
+    get_random_browser_profile,
+    random_delay,
+)
+from src.utils.validators import (
+    ScrapedPrice,
+    is_probable_m4_mac_mini,
+    parse_specs_from_title,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +39,7 @@ class ToppreiseScraper:
 
     def __init__(self, proxy=None):
         self.proxy = proxy
+        self.browser_profile = get_random_browser_profile(browser="chrome")
 
     def run(self) -> list[ScrapedPrice]:
         """Public entry point."""
@@ -46,11 +55,7 @@ class ToppreiseScraper:
     def _create_session(self):
         from curl_cffi import requests as cffi_requests
         session = cffi_requests.Session(impersonate="chrome")
-        session.headers.update({
-            "User-Agent": get_random_user_agent(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
-        })
+        session.headers.update(build_headers_for_profile(self.browser_profile))
         if self.proxy:
             session.proxies = {"http": self.proxy, "https": self.proxy}
         return session
@@ -187,6 +192,8 @@ class ToppreiseScraper:
 
             if price is None or price < 100:
                 return []
+            if not is_probable_m4_mac_mini(title, external_id=mpn or f"tp-{pid}"):
+                return []
 
             offers_info = f" ({offer_count} offers)" if offer_count else ""
             logger.info(f"[{self.STORE_NAME}] {title}: CHF {price:.2f}{offers_info}")
@@ -267,6 +274,8 @@ class ToppreiseScraper:
             )
 
             try:
+                if not is_probable_m4_mac_mini(offer_title, external_id=offer_external_id):
+                    continue
                 results.append(ScrapedPrice(
                     title=offer_title,
                     price_chf=price,
@@ -285,6 +294,8 @@ class ToppreiseScraper:
         deduped: dict[tuple[str, str], ScrapedPrice] = {}
 
         for offer in offers:
+            if not is_probable_m4_mac_mini(offer.title, external_id=offer.external_id):
+                continue
             specs = parse_specs_from_title(offer.title, external_id=offer.external_id)
             if specs:
                 config_key = (

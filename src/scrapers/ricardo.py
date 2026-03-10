@@ -6,7 +6,8 @@ import re
 from typing import Optional
 
 from src.scrapers.base import BaseScraper
-from src.utils.validators import ScrapedPrice
+from src.utils.stealth import build_playwright_context_kwargs
+from src.utils.validators import ScrapedPrice, is_probable_m4_mac_mini
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class RicardoScraper(BaseScraper):
     BASE_URL = "https://www.ricardo.ch"
 
     SEARCH_URLS = [
-        "https://www.ricardo.ch/de/s/mac+mini?sort=newest",
+        "https://www.ricardo.ch/de/s/mac+mini+m4?sort=newest",
     ]
 
     def search_mac_mini(self) -> list[ScrapedPrice]:
@@ -44,14 +45,7 @@ class RicardoScraper(BaseScraper):
             )
 
             context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                locale="de-CH",
-                timezone_id="Europe/Zurich",
-                user_agent=(
-                    "Mozilla/5.0 (X11; Linux x86_64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                ),
+                **build_playwright_context_kwargs(self.browser_profile)
             )
 
             page = context.new_page()
@@ -132,18 +126,18 @@ class RicardoScraper(BaseScraper):
                     if url_path.startswith("http")
                     else f"{self.BASE_URL}{url_path}"
                 )
-
-                try:
-                    validated = ScrapedPrice(
-                        title=title,
-                        price_chf=float(price),
-                        url=url,
-                        external_id=str(article_id),
-                        availability=True,
-                    )
-                    results.append(validated)
-                except (ValueError, TypeError) as e:
-                    logger.debug(f"[Ricardo] Skip API item '{title}': {e}")
+                if is_probable_m4_mac_mini(title, external_id=str(article_id)):
+                    try:
+                        validated = ScrapedPrice(
+                            title=title,
+                            price_chf=float(price),
+                            url=url,
+                            external_id=str(article_id),
+                            availability=True,
+                        )
+                        results.append(validated)
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"[Ricardo] Skip API item '{title}': {e}")
 
             for v in data.values():
                 self._extract_from_api(v, results, depth + 1)
@@ -207,12 +201,12 @@ class RicardoScraper(BaseScraper):
                 continue
 
             lines = [l.strip() for l in text.split("\n") if l.strip()]
-            title = lines[0] if lines else text[:100]
-
             url = href if href.startswith("http") else f"{self.BASE_URL}{href}"
-
             ext_id_match = re.search(r"/a/(\d+)", url)
             external_id = ext_id_match.group(1) if ext_id_match else None
+            title = lines[0] if lines else text[:100]
+            if not is_probable_m4_mac_mini(title, external_id=external_id):
+                continue
 
             try:
                 validated = ScrapedPrice(

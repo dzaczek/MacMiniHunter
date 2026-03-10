@@ -3,10 +3,8 @@
 import json
 import logging
 import re
-from typing import Optional
 
 from src.scrapers.base import BaseScraper
-from src.utils.stealth import get_random_user_agent
 from src.utils.validators import ScrapedPrice
 
 logger = logging.getLogger(__name__)
@@ -21,9 +19,7 @@ class BrackScraper(BaseScraper):
     def search_mac_mini(self) -> list[ScrapedPrice]:
         results: list[ScrapedPrice] = []
 
-        self.session.headers["User-Agent"] = get_random_user_agent()
-
-        params = {"query": "Mac Mini"}
+        params = {"query": "Mac Mini M4"}
         # Brack can be slow - retry once on timeout
         response = None
         for attempt in range(2):

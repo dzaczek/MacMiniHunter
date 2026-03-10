@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from src.utils.stealth import get_random_ipv6
+from src.utils.stealth import build_headers_for_profile, get_random_browser_profile
 from src.utils.validators import ScrapedPrice
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ class GalaxusScraper:
 
     def __init__(self, proxy=None):
         self.proxy = proxy
+        self.browser_profile = get_random_browser_profile(browser="chrome")
         # Galaxus is IPv4-only (no AAAA records), skip IPv6 binding
         self.local_addr = None
 
@@ -62,6 +63,9 @@ class GalaxusScraper:
         if self.local_addr:
             session_kwargs["interface"] = self.local_addr
         session = cffi_requests.Session(**session_kwargs)
+        session.headers.update(build_headers_for_profile(self.browser_profile))
+        if self.proxy:
+            session.proxies = {"http": self.proxy, "https": self.proxy}
         results: list[ScrapedPrice] = []
 
         # Step 1: Discover product pages dynamically

@@ -5,6 +5,7 @@ import logging
 import re
 
 from src.scrapers.base import BaseScraper
+from src.utils.stealth import build_headers_for_profile
 from src.utils.validators import ScrapedPrice
 
 logger = logging.getLogger(__name__)
@@ -25,14 +26,9 @@ class TuttiScraper(BaseScraper):
         # Override stealth session - Tutti returns brotli with stealth UA
         import requests
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/131.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
-            "Accept-Language": "de-CH,de;q=0.9",
-        })
+        self.session.headers.update(
+            build_headers_for_profile(self.browser_profile, compressed=False)
+        )
 
     def search_mac_mini(self) -> list[ScrapedPrice]:
         results: list[ScrapedPrice] = []

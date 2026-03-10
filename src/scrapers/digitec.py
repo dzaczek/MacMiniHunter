@@ -12,7 +12,7 @@ import re
 from typing import Optional
 
 from src.scrapers.base import BaseScraper
-from src.utils.stealth import get_random_user_agent
+from src.utils.stealth import build_playwright_context_kwargs
 from src.utils.validators import ScrapedPrice
 
 logger = logging.getLogger(__name__)
@@ -34,8 +34,6 @@ class DigitecScraper(BaseScraper):
     def _try_requests(self) -> list[ScrapedPrice]:
         """Extract data via requests + __NEXT_DATA__ parsing."""
         results: list[ScrapedPrice] = []
-
-        self.session.headers["User-Agent"] = get_random_user_agent()
 
         try:
             response = self.session.get(self.SEARCH_URL, timeout=15)
@@ -93,9 +91,7 @@ class DigitecScraper(BaseScraper):
                 args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
             )
             context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                locale="de-CH",
-                timezone_id="Europe/Zurich",
+                **build_playwright_context_kwargs(self.browser_profile)
             )
             page = context.new_page()
             Stealth().apply_stealth_sync(page)

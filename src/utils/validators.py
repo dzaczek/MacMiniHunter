@@ -14,8 +14,29 @@ ACCESSORY_KEYWORDS = [
     "ssd für", "ram für", "speicher für", "ram 667", "ram 800",
     "festplatte", "hard drive", "lüfter", "fan ", "netzteil",
     "power supply", "display", "monitor", "tasche", "bag",
-    "2gb ram", "4gb ram", "gehäuse", "enclosure",
+    "2gb ram", "4gb ram", "gehäuse", "enclosure", "rackmount", "mount kit",
 ]
+M4_REQUIRED_KEYWORDS = ["m4", "mu9d3", "mu9e3", "mxk", "mcy", "mxkr", "mxlt", "mxln", "mxkp"]
+APPLE_M4_PART_PREFIXES = (
+    "MCX44",
+    "MCYT4",
+    "MDAP4",
+    "MDAQ4",
+    "MDAY4",
+    "MU9D3",
+    "MU9E3",
+)
+# Prefixes below identify Mac mini (2024) M4 family, but are not mapped to exact
+# RAM/SSD/core specs yet. They are used for family detection only.
+APPLE_M4_FAMILY_ONLY_PREFIXES = (
+    "MDAP4",
+    "MDAQ4",
+    "MDAY4",
+)
+M4_PART_PATTERN = re.compile(
+    rf"({'|'.join(APPLE_M4_PART_PREFIXES)})(?:[A-Z0-9]{{0,3}}(?:/[A-Z])?)?",
+    re.IGNORECASE,
+)
 
 # All valid Apple Silicon chips
 VALID_CHIPS = {"M1", "M1 PRO", "M1 MAX", "M1 ULTRA",
@@ -30,7 +51,8 @@ SSD_NORMALIZE = {1024: 1000, 2048: 2000, 4096: 4000, 8192: 8000}
 
 # Apple Mac Mini M4 (2024) SKU → full specs mapping
 # SKU prefix (without region suffix like SM/A) → (chip, cpu_cores, gpu_cores, ram, ssd)
-# This is the most reliable way to identify exact configurations across stores
+# This is the most reliable way to identify exact configurations across stores.
+# Only include prefixes here when the exact config is known.
 APPLE_SKU_SPECS: dict[str, tuple[str, int, int, int, int]] = {
     # M4 base models
     "MU9D3": ("M4", 10, 10, 16, 256),
@@ -253,3 +275,25 @@ def parse_specs_from_title(title: str, external_id: Optional[str] = None) -> Opt
                              cpu_cores=cpu_cores, gpu_cores=gpu_cores)
     except ValueError:
         return None
+
+
+def is_probable_m4_mac_mini(title: str, external_id: Optional[str] = None) -> bool:
+    """Return True when a listing is likely an M4-family Mac Mini."""
+    lower = title.lower()
+    if not any(kw in lower for kw in MAC_MINI_KEYWORDS):
+        return False
+    if any(kw in lower for kw in ACCESSORY_KEYWORDS):
+        return False
+
+    parsed = parse_specs_from_title(title, external_id=external_id)
+    if parsed is not None:
+        return parsed.chip.startswith("M4")
+
+    haystacks = [lower]
+    if external_id:
+        haystacks.append(external_id.lower())
+
+    if any(M4_PART_PATTERN.search(hay.upper()) for hay in [title, external_id or ""]):
+        return True
+
+    return any(any(marker in hay for marker in M4_REQUIRED_KEYWORDS) for hay in haystacks)
